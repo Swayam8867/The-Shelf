@@ -1,11 +1,10 @@
 # The Shelf — your Digistore24 affiliate catalog
 
-A public product catalog with a real, secure admin login. Only you can add,
+A public product catalog with a real, secure admin login.Only you can add,
 edit, or delete products — enforced by the database itself, not just by
 website code.
 
 Follow every step below in order. None of it requires coding.
-
 ---
 
 ## Part 1 — Create your database (Supabase)
