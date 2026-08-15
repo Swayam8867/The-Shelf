@@ -117,7 +117,7 @@ export default function App() {
     <div className="page">
       <header className="header">
         <div>
-          <h1 className="site-title">{SITE_NAME}</h1>
+          <img src="/logo.jpg" alt="The Shelf" style={{ height: '56px' }} /> 
           <p className="site-tagline">{SITE_TAGLINE}</p>
         </div>
         {isAdmin ? (
