@@ -1,4 +1,4 @@
-# The Shelf — your Digistore24 affiliate catalog
+# The Shelf Picks— your Digistore24 affiliate catalog
 
 A public product catalog with a real, secure admin login.Only you can add,
 edit, or delete products — enforced by the database itself, not just by
