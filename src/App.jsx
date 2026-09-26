@@ -29,6 +29,7 @@ export default function App() {
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -212,8 +213,34 @@ export default function App() {
             <label className="field-label">Category</label>
             <input className="fld" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
 
-            <label className="field-label">Image URL</label>
-            <input className="fld" value={form.image} onChange={(e) => setForm({ ...form, image: e.target.value })} />
+            <label className="field-label">Product image</label>
+            <input
+              className="fld"
+              type="file"
+              accept="image/*"
+              onChange={async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setUploading(true);
+                const fileName = `${Date.now()}-${file.name}`;
+                const { error } = await supabase.storage
+                  .from("product-images")
+                  .upload(fileName, file);
+                if (error) {
+                  alert("Upload failed: " + error.message);
+                } else {
+                  const { data } = supabase.storage
+                    .from("product-images")
+                    .getPublicUrl(fileName);
+                  setForm((f) => ({ ...f, image: data.publicUrl }));
+                }
+                setUploading(false);
+              }}
+            />
+            {uploading && <p className="muted" style={{ marginTop: 6 }}>Uploading…</p>}
+            {form.image && !uploading && (
+              <img src={form.image} alt="" style={{ marginTop: 8, height: 60, borderRadius: 6 }} />
+            )}
 
             <label className="field-label">Description</label>
             <textarea className="fld" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
