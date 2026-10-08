@@ -15,6 +15,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
+  const [selected, setSelected] = useState(null); // product shown in the detail view
 
   const showAdminEntry =
     new URLSearchParams(window.location.search).get("owner") === SECRET_WORD;
@@ -39,6 +40,15 @@ export default function App() {
       setSession(sess);
     });
     return () => listener.subscription.unsubscribe();
+  }, []);
+
+  // Close the detail view with the Escape key
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "Escape") setSelected(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   async function fetchProducts() {
@@ -118,7 +128,7 @@ export default function App() {
     <div className="page">
       <header className="header">
         <div>
-          <img src="/logo.jpg" alt="The Shelf" style={{ height: '56px' }} /> 
+          <img src="/logo.jpg" alt="The Shelf" style={{ height: "56px" }} />
           <p className="site-tagline">{SITE_TAGLINE}</p>
         </div>
         {isAdmin ? (
@@ -160,21 +170,33 @@ export default function App() {
         ) : (
           <div className="grid">
             {visible.map((p) => (
-              <div key={p.id} className="card">
+              <div
+                key={p.id}
+                className="card card-clickable"
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelected(p)}
+                onKeyDown={(e) => e.key === "Enter" && setSelected(p)}
+              >
                 <div className="card-image">
                   {p.image ? <img src={p.image} alt={p.name} /> : <div className="no-image" />}
                 </div>
-                <div className="card-body">
-                  <span className="category-tag">{p.category}</span>
-                  <h3 className="card-title">{p.name}</h3>
-                  <p className="card-desc">{p.description}</p>
-                  <a className="btn btn-dark" href={p.link} target="_blank" rel="noopener noreferrer sponsored">
-                    Get it →
-                  </a>
+                <div className="card-body card-body-compact">
+                  <h3 className="card-title card-title-compact">{p.name}</h3>
                   {isAdmin && (
                     <div className="card-admin">
-                      <button className="link-btn" onClick={() => openEditForm(p)}>Edit</button>
-                      <button className="link-btn link-danger" onClick={() => deleteProduct(p.id)}>Delete</button>
+                      <button
+                        className="link-btn"
+                        onClick={(e) => { e.stopPropagation(); openEditForm(p); }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="link-btn link-danger"
+                        onClick={(e) => { e.stopPropagation(); deleteProduct(p.id); }}
+                      >
+                        Delete
+                      </button>
                     </div>
                   )}
                 </div>
@@ -187,6 +209,35 @@ export default function App() {
       <footer className="footer">
         <p>Some links on this page are affiliate links. If you buy through them, we may earn a commission at no extra cost to you.</p>
       </footer>
+
+      {/* Product detail view */}
+      {selected && (
+        <div className="modal-backdrop" onClick={() => setSelected(null)}>
+          <div className="modal detail-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="detail-close" onClick={() => setSelected(null)} aria-label="Close">
+              ✕
+            </button>
+            <div className="detail-image">
+              {selected.image ? (
+                <img src={selected.image} alt={selected.name} />
+              ) : (
+                <div className="no-image" />
+              )}
+            </div>
+            <span className="category-tag">{selected.category}</span>
+            <h2 className="detail-title">{selected.name}</h2>
+            {selected.description && <p className="detail-desc">{selected.description}</p>}
+            <a
+              className="btn btn-dark full"
+              href={selected.link}
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+            >
+              Buy now →
+            </a>
+          </div>
+        </div>
+      )}
 
       {showLogin && (
         <div className="modal-backdrop" onClick={() => setShowLogin(false)}>
@@ -250,7 +301,7 @@ export default function App() {
 
             <button
               className="btn btn-accent full"
-              disabled={saving || !form.name.trim() || !form.category.trim() || !form.link.trim()}
+              disabled={saving || uploading || !form.name.trim() || !form.category.trim() || !form.link.trim()}
               onClick={saveProduct}
             >
               {saving ? "Saving…" : editingId ? "Save changes" : "Add to shelf"}
