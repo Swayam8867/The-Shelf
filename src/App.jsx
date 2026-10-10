@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 
-const SITE_NAME = "The Shelf";
 const SITE_TAGLINE = "A small, curated list of things worth your time.";
 
 // Change this to any secret word only you know.
@@ -15,7 +14,9 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [selected, setSelected] = useState(null); // product shown in the detail view
+
+  // Simple page routing: "/" = shelf, "/product/<id>" = product page
+  const [path, setPath] = useState(window.location.pathname);
 
   const showAdminEntry =
     new URLSearchParams(window.location.search).get("owner") === SECRET_WORD;
@@ -42,14 +43,18 @@ export default function App() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  // Close the detail view with the Escape key
+  // Keep the page in sync with the browser's back/forward buttons
   useEffect(() => {
-    function onKey(e) {
-      if (e.key === "Escape") setSelected(null);
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const onPop = () => setPath(window.location.pathname);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
+
+  function go(to) {
+    window.history.pushState({}, "", to);
+    setPath(to);
+    window.scrollTo(0, 0);
+  }
 
   async function fetchProducts() {
     setLoading(true);
@@ -124,11 +129,23 @@ export default function App() {
   const visible = activeCategory === "All" ? products : products.filter((p) => p.category === activeCategory);
   const isAdmin = !!session;
 
+  // Which page are we on?
+  const productMatch = path.match(/^\/product\/([^/]+)/);
+  const productId = productMatch ? productMatch[1] : null;
+  const currentProduct = productId ? products.find((p) => String(p.id) === productId) : null;
+
+  // Show the product name in the browser tab on product pages
+  useEffect(() => {
+    document.title = currentProduct ? currentProduct.name + " | The Shelf" : "The Shelf";
+  }, [currentProduct]);
+
   return (
     <div className="page">
       <header className="header">
         <div>
-          <img src="/logo.jpg" alt="The Shelf" style={{ height: "56px" }} />
+          <a href="/" onClick={(e) => { e.preventDefault(); go("/"); }}>
+            <img src="/logo.jpg" alt="The Shelf" style={{ height: "56px" }} />
+          </a>
           <p className="site-tagline">{SITE_TAGLINE}</p>
         </div>
         {isAdmin ? (
@@ -138,106 +155,120 @@ export default function App() {
         ) : null}
       </header>
 
-      {categories.length > 1 && (
-        <div className="tabs">
-          {categories.map((c) => (
-            <button
-              key={c}
-              className={"tab" + (activeCategory === c ? " tab-active" : "")}
-              onClick={() => setActiveCategory(c)}
-            >
-              {c}
-            </button>
-          ))}
-        </div>
-      )}
+      {productId ? (
+        /* ---------- PRODUCT PAGE ---------- */
+        <main className="main">
+          <button className="back-btn" onClick={() => go("/")}>← Back to shelf</button>
 
-      {isAdmin && (
-        <div className="admin-bar">
-          <button className="btn btn-accent" onClick={openAddForm}>+ Add product</button>
-        </div>
-      )}
-
-      <main className="main">
-        {loading ? (
-          <p className="muted">Loading your shelf…</p>
-        ) : error ? (
-          <p className="muted">Couldn't load products: {error}</p>
-        ) : visible.length === 0 ? (
-          <div className="empty">
-            <p>{products.length === 0 ? "Nothing on the shelf yet." : "Nothing in this category yet."}</p>
-          </div>
-        ) : (
-          <div className="grid">
-            {visible.map((p) => (
-              <div
-                key={p.id}
-                className="card card-clickable"
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelected(p)}
-                onKeyDown={(e) => e.key === "Enter" && setSelected(p)}
-              >
-                <div className="card-image">
-                  {p.image ? <img src={p.image} alt={p.name} /> : <div className="no-image" />}
-                </div>
-                <div className="card-body card-body-compact">
-                  <h3 className="card-title card-title-compact">{p.name}</h3>
-                  {isAdmin && (
-                    <div className="card-admin">
-                      <button
-                        className="link-btn"
-                        onClick={(e) => { e.stopPropagation(); openEditForm(p); }}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="link-btn link-danger"
-                        onClick={(e) => { e.stopPropagation(); deleteProduct(p.id); }}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
+          {loading ? (
+            <p className="muted">Loading…</p>
+          ) : !currentProduct ? (
+            <div className="empty">
+              <p>This product couldn't be found.</p>
+            </div>
+          ) : (
+            <div className="product-page">
+              <div className="product-page-image">
+                {currentProduct.image ? (
+                  <img src={currentProduct.image} alt={currentProduct.name} />
+                ) : (
+                  <div className="no-image" />
+                )}
               </div>
-            ))}
-          </div>
-        )}
-      </main>
+              <div className="product-page-info">
+                <span className="category-tag">{currentProduct.category}</span>
+                <h1 className="product-page-title">{currentProduct.name}</h1>
+                {currentProduct.description && (
+                  <p className="product-page-desc">{currentProduct.description}</p>
+                )}
+                <a
+                  className="btn btn-dark buy-btn"
+                  href={currentProduct.link}
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                >
+                  Buy now →
+                </a>
+              </div>
+            </div>
+          )}
+        </main>
+      ) : (
+        /* ---------- SHELF (HOME) ---------- */
+        <>
+          {categories.length > 1 && (
+            <div className="tabs">
+              {categories.map((c) => (
+                <button
+                  key={c}
+                  className={"tab" + (activeCategory === c ? " tab-active" : "")}
+                  onClick={() => setActiveCategory(c)}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="admin-bar">
+              <button className="btn btn-accent" onClick={openAddForm}>+ Add product</button>
+            </div>
+          )}
+
+          <main className="main">
+            {loading ? (
+              <p className="muted">Loading your shelf…</p>
+            ) : error ? (
+              <p className="muted">Couldn't load products: {error}</p>
+            ) : visible.length === 0 ? (
+              <div className="empty">
+                <p>{products.length === 0 ? "Nothing on the shelf yet." : "Nothing in this category yet."}</p>
+              </div>
+            ) : (
+              <div className="grid">
+                {visible.map((p) => (
+                  <div
+                    key={p.id}
+                    className="card card-clickable"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => go("/product/" + p.id)}
+                    onKeyDown={(e) => e.key === "Enter" && go("/product/" + p.id)}
+                  >
+                    <div className="card-image">
+                      {p.image ? <img src={p.image} alt={p.name} /> : <div className="no-image" />}
+                    </div>
+                    <div className="card-body card-body-compact">
+                      <h3 className="card-title card-title-compact">{p.name}</h3>
+                      {isAdmin && (
+                        <div className="card-admin">
+                          <button
+                            className="link-btn"
+                            onClick={(e) => { e.stopPropagation(); openEditForm(p); }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="link-btn link-danger"
+                            onClick={(e) => { e.stopPropagation(); deleteProduct(p.id); }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </main>
+        </>
+      )}
 
       <footer className="footer">
         <p>Some links on this page are affiliate links. If you buy through them, we may earn a commission at no extra cost to you.</p>
       </footer>
-
-      {/* Product detail view */}
-      {selected && (
-        <div className="modal-backdrop" onClick={() => setSelected(null)}>
-          <div className="modal detail-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="detail-close" onClick={() => setSelected(null)} aria-label="Close">
-              ✕
-            </button>
-            <div className="detail-image">
-              {selected.image ? (
-                <img src={selected.image} alt={selected.name} />
-              ) : (
-                <div className="no-image" />
-              )}
-            </div>
-            <span className="category-tag">{selected.category}</span>
-            <h2 className="detail-title">{selected.name}</h2>
-            {selected.description && <p className="detail-desc">{selected.description}</p>}
-            <a
-              className="btn btn-dark full"
-              href={selected.link}
-              target="_blank"
-              rel="noopener noreferrer sponsored"
-            >
-              Buy now →
-            </a>
-          </div>
-        </div>
-      )}
 
       {showLogin && (
         <div className="modal-backdrop" onClick={() => setShowLogin(false)}>
