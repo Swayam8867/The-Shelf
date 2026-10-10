@@ -18,8 +18,16 @@ export default function App() {
   // Simple page routing: "/" = shelf, "/product/<id>" = product page
   const [path, setPath] = useState(window.location.pathname);
 
-  const showAdminEntry =
+  const [showAdminEntry] = useState(() => {
+  const fromLink =
     new URLSearchParams(window.location.search).get("owner") === SECRET_WORD;
+  try {
+    if (fromLink) sessionStorage.setItem("shelf-owner", "1");
+    return fromLink || sessionStorage.getItem("shelf-owner") === "1";
+  } catch (e) {
+    return fromLink;
+  }
+});
 
   const [session, setSession] = useState(null);
   const [showLogin, setShowLogin] = useState(false);
